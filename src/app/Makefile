@@ -76,13 +76,7 @@ $(BINDIR)/$(PROJECT).bin: $(BINDIR)/$(PROJECT).elf
 $(BINDIR)/$(PROJECT).elf: $(OBJ)
 	@mkdir -p $(dir $@)
 	$(CC) $(OBJ) $(LDFLAGS) -o $(BINDIR)/$(PROJECT).elf
-#	$(OBJDUMP) -D $(BINDIR)/$(PROJECT).elf > $(BINDIR)/$(PROJECT).lst
-#	$(SIZE) $(BINDIR)/$(PROJECT).elf
 
-macros:
-	$(CC) $(GCFLAGS) -dM -E - < /dev/null
-
-cleanBuild: clean
 
 clean:
 	$(RM) $(BINDIR)

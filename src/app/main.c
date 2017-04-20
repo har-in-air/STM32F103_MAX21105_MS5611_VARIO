@@ -11,26 +11,27 @@
 #include "adc.h"
 #include "uart.h"
 #include "i2c.h"
-#include "hmc5883l.h"
 #include "max21105.h"
 #include "ms5611.h"
 #include "MadgwickAHRS.h"
 #include "kalmanfilter3.h"
 #include "audio.h"
-#include "lcdmot80x48.h"
+#ifdef CFG_USE_MAGNETOMETER
+    #include "hmc5883l.h"
+#endif
+#ifdef CFG_LCD_DISPLAY
+    #include "lcdmot80x48.h"
+#endif
 #include <math.h>
 
   
-volatile int drdyCounter = 0;
-volatile uint32_t gBtnState;
+volatile int gDRDYCounter = 0;
+volatile u32 gBtnState;
 volatile int gbBtnPressed;
 
-volatile float  zcmKF;
-volatile float  vcpsKF;
-volatile int bDataReady = 0;
-
-int altitudeM;
-int vertCps;
+volatile float  kfAltitudeCm;
+volatile float  kfClimbrateCps;
+volatile int gbDataReady = 0;
 
 int getBatteryVoltagex10(void);
 void AHRS_Update(void);
@@ -49,16 +50,17 @@ int main(void){
   uart_Printf(&huart1, "\r\nc8t6 imu vario %s %s\r\n", __DATE__, __TIME__);	
   uart_Printf(&huart1, "SystemCoreClock %ld\r\n", HAL_RCC_GetHCLKFreq());	
   
-  HAL_Delay(100);  	
+  delayMs(100);  	
+#ifdef CFG_USE_MAGNETOMETER
   u32 hmcID = hmc5883L_GetID();
   uart_Printf(&huart1, "HMC5883L ID = 0x%X [0x483433]\r\n", hmcID);
   hmc5883L_Config();
+#endif
   
   u08 maxID = max_GetID();
   uart_Printf(&huart1, "MAX21105 ID = 0x%X [0xB4]\r\n", maxID);
   max_Configure();
   
-  lcd_Init();
 
   u32 us;
 
@@ -83,14 +85,19 @@ int main(void){
   //hmc5883L_Calibrate();
   
   int bvx10 = getBatteryVoltagex10();
+  __ADC1_CLK_DISABLE(); // save power by disabling adc after power on battery voltage measurement
   uart_Printf(&huart1, "Battery Voltage = %d.%dV\r\n", bvx10/10, bvx10%10);
+#ifdef CFG_LCD_DISPLAY
   delayMs(1000);
+  lcd_Init();
   lcd_Printf(0,0,"IMU Vario");
   lcd_Printf(1,0,"v0.9");
   lcd_Printf(2,0,"%d.%dV", bvx10/10, bvx10%10);
-  __ADC1_CLK_DISABLE();
   delayMs(3000);
   lcd_Clear();
+  int displayCps  = 0;
+  int displayCounter = 0;
+#endif
   
   MS5611_Config();
 //  MS5611_Test(64);
@@ -98,7 +105,7 @@ int main(void){
   kalmanFilter3_Configure(MS5611_Z_VARIANCE, IMU_ACCEL_VARIANCE, IMU_ACCELBIAS_VARIANCE, zCmAvg_, 0.0f, 0.0f);
   
   MS5611_InitializeSampleStateMachine();
-  drdyCounter = 0;
+  gDRDYCounter = 0;
   
   dwt_SetMarker();
   AHRS_Update();
@@ -107,18 +114,17 @@ int main(void){
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   float iirCps = 0.0f;
-  int displayCps  = 0;
-  int displayCounter = 0;
   int userMode = MODE_VARIO;
   int yaw,pitch, roll;
+
   
   while (1) {
-        if (bDataReady) {
-            bDataReady = 0;
+        if (gbDataReady) {
+            gbDataReady = 0;
             if (gbBtnPressed) {
                 gbBtnPressed = 0;
                 userMode++; 
-                if (userMode > MODE_CALIB) {
+                if (userMode > MODE_RESERVED) {
                     userMode = MODE_VARIO;
                     }
                 lcd_Clear();
@@ -126,15 +132,15 @@ int main(void){
             switch (userMode) {
                 case MODE_VARIO :
                 DINT();
-                altitudeM =  (int)((zcmKF + 50.0f)/100.0f);  
-                int audioCps =  vcpsKF >= 0.0f ? (int)(vcpsKF+0.5f) : (int)(vcpsKF-0.5f);
-                iirCps = iirCps*0.95f + vcpsKF*0.05f; // use heavily damped vario reading for display
+                int altitudeM =  (int)((kfAltitudeCm + 50.0f)/100.0f);  
+                int audioCps =  kfClimbrateCps >= 0.0f ? (int)(kfClimbrateCps+0.5f) : (int)(kfClimbrateCps-0.5f);
+                iirCps = iirCps*0.95f + kfClimbrateCps*0.05f; // use heavily damped vario reading for display
                 EINT();
                 CLAMP(audioCps, -1000, 1000);
                 audio_VarioBeep(audioCps);        
-                displayCps =  iirCps >= 0.0f ? (int)((iirCps+5.0f)/10.0f) : (int)((iirCps-5.0f)/10.0f);
-                CLAMP(displayCps, -99, 99);
-            
+#ifdef CFG_LCD_DISPLAY                
+                int displayCps =  iirCps >= 0.0f ? (int)((iirCps+5.0f)/10.0f) : (int)((iirCps-5.0f)/10.0f);
+                CLAMP(displayCps, -99, 99);            
                 if (displayCounter == 0 ) {
                     lcd_Printf13x16(0,28,"%4d",altitudeM);
                     }
@@ -151,6 +157,7 @@ int main(void){
                 if (displayCounter >= 5 ) {
                     displayCounter = 0;
                     }
+#endif                    
                 break;
             
                 case MODE_YPR:
@@ -159,6 +166,7 @@ int main(void){
                 pitch = (pitchDeg >= 0.0f ? (int)(pitchDeg+0.5f) : (int)(pitchDeg - 0.5f));
                 roll = (rollDeg >= 0.0f ? (int)(rollDeg+0.5f) : (int)(rollDeg - 0.5f));
                 EINT();
+#ifdef CFG_LCD_DISPLAY                
                 int neg = 0;
                 if (yaw < 0 ) {
                     neg = 1; 
@@ -177,10 +185,10 @@ int main(void){
                     roll = -roll;
                     }
                 lcd_Printf13x16(4,0,"%c%03d",neg ? '-':'+', roll);
-                
+#endif                
                 break;
             
-                case MODE_CALIB:
+                case MODE_RESERVED:
                 default :
                 break;
                 }
@@ -203,43 +211,45 @@ int getBatteryVoltagex10(void) {
 
 void AHRS_Update(void) {
     max_GetAllChannelData();
-    //hmc5883L_GetValues(&mxned,&myned,&mzned);
+#ifdef CFG_USE_MAGNETOMETER    
+    hmc5883L_GetValues(&mxned,&myned,&mzned);
+#endif
     float accelMagnitude = sqrt(axned*axned + ayned*ayned + azned*azned); 
     // accelerometer data is used for computing orientation only when magnitude is between 0.75G and 1.25G.
     // otherwise, the computation only integrates the gyroscope data.
     int bAHRSUseAccel = ((accelMagnitude > 750.0f) && (accelMagnitude < 1250.0f)) ? 1 : 0;
-    
-//	imu_MadgwickAHRSupdate9DOF(bAHRSUseAccel,0.005f,
-//					gxned*PI_DIV_180,gyned*PI_DIV_180,gzned*PI_DIV_180,
-//					axned,ayned,azned,mxned,myned,mzned);
+
+#ifdef CFG_USE_MAGNETOMETER        
+	imu_MadgwickAHRSupdate9DOF(bAHRSUseAccel,0.005f,
+					gxned*PI_DIV_180,gyned*PI_DIV_180,gzned*PI_DIV_180,
+					axned,ayned,azned,mxned,myned,mzned);
+#else                    
 	imu_MadgwickAHRSupdate6DOF(bAHRSUseAccel,0.005f,
 					gxned*PI_DIV_180,gyned*PI_DIV_180,gzned*PI_DIV_180,
 					axned,ayned,azned);
+#endif
     imu_GravityCompensatedAccel(axned,ayned,azned,q0,q1,q2,q3);
     imu_Quat2YPR(q0,q1,q2,q3);    
     }
 
 
 
+// Interrupt service routine for EXTI 15:10 gpio interrupts.
+// MAX21105 data ready (DRDY) signal on INT1 pin is connected to gpio pin PB11
 
-
-/**
-* @brief This function handles EXTI 15:10 line interrupts.
-* MAX21105 drdy signal  is on PB11
-*/
 void EXTI15_10_IRQHandler(void){
     AHRS_Update();
-    drdyCounter++;
-    if (drdyCounter > 2) {
-        drdyCounter = 0;
+    gDRDYCounter++;
+    if (gDRDYCounter > 2) {
+        gDRDYCounter = 0;
         // debounce button
-        gBtnState = (gBtnState<<1) | ((uint32_t)BTN_PRESSED);
+        gBtnState = (gBtnState<<1) | ((u32)BTN_PRESSED);
         if ((gBtnState | 0xFFFFFFF0) == 0xFFFFFFF8) {
             gbBtnPressed = 1;
             }
         if (MS5611_SampleStateMachine()) {
-            kalmanFilter3_Update(zCmSample_,gravityCompensatedAccel, 0.030f, &zcmKF, &vcpsKF);
-            bDataReady = 1;
+            kalmanFilter3_Update(zCmSample_,gravityCompensatedAccel, 0.030f, &kfAltitudeCm, &kfClimbrateCps);
+            gbDataReady = 1;
             }
         }
 

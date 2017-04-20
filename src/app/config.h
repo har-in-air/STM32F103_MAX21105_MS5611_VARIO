@@ -12,8 +12,9 @@
 
 #define MODE_VARIO      0
 #define MODE_YPR        1
-#define MODE_CALIB      2
+#define MODE_RESERVED   2
 
-
+//#define CFG_LCD_DISPLAY
+//#define CFG_USE_MAGNETOMETER
 
 #endif
