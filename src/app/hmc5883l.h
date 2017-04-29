@@ -1,6 +1,7 @@
 #ifndef HMC6883L_H_
 #define HMC6883L_H_
 
+#define HMC5883L_ID             0x483433
 
 #define  HMC5883L_CONFIG_A      0
 #define  HMC5883L_CONFIG_B      1
