@@ -17,6 +17,7 @@
 #define MAX21105_4G_SENSITIVITY  7.50f
 #define MAX21105_8G_SENSITIVITY  3.75f
 
+#define MAX21105_ID             0xB4
 
 // MAX21105 Common Bank
 #define MAX21105_WHOAMI        0x20    // should read 0xB4              
