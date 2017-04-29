@@ -7,7 +7,7 @@ typedef struct BEEP_ {
     int endTick;
 } BEEP;
 
-// climbrate computation is valid to +/- 20m/s
+
 #define VARIO_MAX_CPS         1000
 
 // more audio discrimination for climbrates under this threshold
@@ -27,24 +27,17 @@ typedef struct BEEP_ {
 #define VARIO_STATE_LIFTY_AIR	33
 #define VARIO_STATE_CLIMB   	44
 
+#define CLIMB_DISCRIMINATION_THRESHOLD 25
 
-#define CLIMB_THRESHOLD_MIN		    0
-#define CLIMB_THRESHOLD_MAX         100
-#define CLIMB_THRESHOLD_DEFAULT     50
+#define CLIMB_THRESHOLD     50
+#define SINK_THRESHOLD      -100
+#define ZERO_THRESHOLD	    5
 
-#define SINK_THRESHOLD_MIN		-500
-#define SINK_THRESHOLD_MAX		-100
-#define SINK_THRESHOLD_DEFAULT  -250
-
-#define ZERO_THRESHOLD_MIN		-100
-#define ZERO_THRESHOLD_MAX		100
-#define ZERO_THRESHOLD_DEFAULT	5
-
-#define MAX_VERTICAL_VELOCITY_CPS	2000
 
 void audio_Config(void);
 void audio_Beep(int nFreqHz, int nMsecs);
 void audio_VarioBeep(int nCps);
 void audio_IndicateFault(int nFrequencyHz);
+void audio_GenerateTone(int nFrequencyHz, int ms);
 
 #endif
