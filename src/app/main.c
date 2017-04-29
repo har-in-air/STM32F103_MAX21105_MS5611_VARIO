@@ -16,6 +16,7 @@
 #include "MadgwickAHRS.h"
 #include "kalmanfilter3.h"
 #include "audio.h"
+
 #ifdef CFG_USE_MAGNETOMETER
     #include "hmc5883l.h"
 #endif
@@ -34,6 +35,7 @@ volatile float  kfClimbrateCps;
 volatile int gbDataReady = 0;
 
 int getBatteryVoltagex10(void);
+void indicateBatteryVoltage(int bv);
 void AHRS_Update(void);
 
  
@@ -54,11 +56,23 @@ int main(void){
 #ifdef CFG_USE_MAGNETOMETER
   u32 hmcID = hmc5883L_GetID();
   uart_Printf(&huart1, "HMC5883L ID = 0x%X [0x483433]\r\n", hmcID);
+  if (hmcID != HMC5883L_ID) {
+    while (1) {
+        audio_IndicateFault(300);
+        delayMs(1000);
+        }
+     }
   hmc5883L_Config();
 #endif
   
   u08 maxID = max_GetID();
   uart_Printf(&huart1, "MAX21105 ID = 0x%X [0xB4]\r\n", maxID);
+  if (maxID != MAX21105_ID) {
+    while (1) {
+        audio_IndicateFault(4000);
+        delayMs(1000);
+        }
+     }
   max_Configure();
   
 
@@ -87,6 +101,8 @@ int main(void){
   int bvx10 = getBatteryVoltagex10();
   __ADC1_CLK_DISABLE(); // save power by disabling adc after power on battery voltage measurement
   uart_Printf(&huart1, "Battery Voltage = %d.%dV\r\n", bvx10/10, bvx10%10);
+  indicateBatteryVoltage(bvx10);
+  
 #ifdef CFG_LCD_DISPLAY
   delayMs(1000);
   lcd_Init();
@@ -95,7 +111,7 @@ int main(void){
   lcd_Printf(2,0,"%d.%dV", bvx10/10, bvx10%10);
   delayMs(3000);
   lcd_Clear();
-  int displayCps  = 0;
+
   int displayCounter = 0;
 #endif
   
@@ -206,6 +222,23 @@ int getBatteryVoltagex10(void) {
   int bvx10 = (int) (batVoltage*10.0f + 0.5f); // e.g. 39 = 3.9V
   return bvx10; 
   }
+  
+  
+void indicateBatteryVoltage(int bv) {
+    int numBeeps;
+    if (bv >= 40) numBeeps = 5;
+    else
+    if (bv >= 39) numBeeps = 4;
+    else
+    if (bv >= 37) numBeeps = 3;
+    else
+    if (bv >= 36) numBeeps = 2;
+    else  numBeeps = 1;
+    while (numBeeps--) {
+        audio_GenerateTone(1000, 300);
+        delayMs(300);
+        }
+    }  
 
 
 
