@@ -1,7 +1,9 @@
-##Features
+# STM32F103 altimeter/variometer with LCD display and Bluetooth BLE
+
+## Features
 Basic altimeter/variometer  that fuses accelerometer and barometric sensor data to minimize response lag.
 
-###Hardware
+## Hardware
 1.STM32F103C8T6 microcontroller
 2.MAX21105 accelerometer+gyroscope
 3.MS5611 barometric pressure sensor
@@ -15,10 +17,10 @@ I used separate breakout boards for the micro-controller and the sensors that I'
 PCB layout for the unified schematic. The battery is a salvaged 3.7V 500mAH lipoly battery. Also added a USB to 
 lipoly charger board.  
 
-###Software development environment
+## Software development environment
 Ubuntu 18.04LTS, gcc-arm toolchain, openocd, stlink v2 clone for flashing. STM32CubeMx for generating the low level hardware driver files and headers, and startup code.
 
-###Issues
+## Issues
 1.OpenOCD does not sync with this particular micro-controller unless the reset button is pushed. No such issue with 
 GD32F103RCT6  (which is a cheap clone of the STM32F103RCT6). Go figure.
 2.Uart serial printf with floats does not work. 
