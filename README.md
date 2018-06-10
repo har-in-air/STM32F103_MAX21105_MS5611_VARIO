@@ -1,4 +1,4 @@
-# STM32F103 altimeter/variometer with LCD display and Bluetooth BLE
+# STM32F103 altimeter/variometer with LCD display
 
 ## Features
 Basic altimeter/variometer  that fuses accelerometer and barometric sensor data to minimize response lag.
