@@ -8,7 +8,10 @@ LIBDIR = ../lib
 DRVDIR = ../drv
 BINDIR = bin
 OBJDIR = obj
-OCDDIR = d:/ARMTC/openocd-0.9.0
+
+
+# OCDDIR = d:/ARMTC/openocd-0.9.0
+OCDDIR = /usr/local/share/openocd
 
 # Project target
 CPU = cortex-m3
@@ -19,7 +22,7 @@ DRIVERS = $(DRVDIR)/stm32f1xx_hal.c $(DRVDIR)/stm32f1xx_hal_rcc.c $(DRVDIR)/stm3
  $(DRVDIR)/stm32f1xx_hal_dma.c  $(DRVDIR)/stm32f1xx_hal_tim.c  $(DRVDIR)/stm32f1xx_hal_tim_ex.c  
 
 LIBRARIES = $(LIBDIR)/dwt.c $(LIBDIR)/kalmanfilter3.c \
- $(LIBDIR)/ms5611.c   $(LIBDIR)/MadgwickAHRS.c $(LIBDIR)/piezo.c
+ $(LIBDIR)/ms5611.c  $(LIBDIR)/MahonyAHRS.c $(LIBDIR)/piezo.c 
 
 # Sources
 SRC = $(wildcard $(SRCDIR)/*.c)  ../system_stm32f1xx.c  $(DRIVERS) $(LIBRARIES) 
@@ -32,7 +35,7 @@ INCLUDE  = -I. -I.. -I../lib -I../drv -I../CMSIS/Include
 LSCRIPT = ../STM32F103X8_FLASH.ld
 
 # C Flags
-GCFLAGS  = -Wall -fno-common -mthumb -mcpu=$(CPU) -O2 -DSTM32F103xB --specs=nosys.specs --specs=nano.specs
+GCFLAGS  = -Wall -std=gnu99 -fno-common -mthumb -mcpu=$(CPU) -O2 -DSTM32F103xB --specs=nosys.specs --specs=nano.specs
 GCFLAGS += $(INCLUDE)
 LDFLAGS += -T$(LSCRIPT) -mthumb -mcpu=$(CPU) -lm --specs=nosys.specs --specs=nano.specs
 ASFLAGS += -mcpu=$(CPU)

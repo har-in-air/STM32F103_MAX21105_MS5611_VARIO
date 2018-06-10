@@ -24,10 +24,12 @@
 #define LCDRST_LO()    {GPIOA->BSRR = (PIN_LCDRST<<16);}
 #define LCDRST_HI()    {GPIOA->BSRR = PIN_LCDRST;}
 
+#define PIN_DBG	   GPIO_PIN_7
+#define DBG_LO()    {GPIOB->BSRR = (PIN_DBG<<16);}
+#define DBG_HI()    {GPIOB->BSRR = PIN_DBG;}
+
 #define BTN_PIN         GPIO_PIN_11
-
 #define BTN_PRESSED      ((GPIOA->IDR & BTN_PIN) ? 1 : 0)
-
 
 #define delayMs(mSecs)  HAL_Delay(mSecs)
 #define millis()        HAL_GetTick()

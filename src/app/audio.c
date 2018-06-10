@@ -8,16 +8,16 @@
 
 
 
-int gnDiscrimThreshold =  CLIMB_DISCRIMINATION_THRESHOLD;
+int gnDiscrimThreshold =  25;
 int gnBeepPeriodTicks = 0;
 int gnBeepEndTick = 0;
 int gnBeepCps = 0;
 int gnVarioCps = 0;
 int gnFreqHz  = 0;
 
-int gnSinkToneCps       = SINK_THRESHOLD;
-int gnClimbToneCps      = CLIMB_THRESHOLD;
-int gnLiftyAirToneCps   = ZERO_THRESHOLD;
+int gnSinkToneCps       = SINK_THRESHOLD_DEFAULT;
+int gnClimbToneCps      = CLIMB_THRESHOLD_DEFAULT;
+int gnLiftyAirToneCps   = ZERO_THRESHOLD_DEFAULT;
 int gnVarioState;
 
 const int gnOffScaleHiTone[10]= {2000,1000,2000,1000,2000,1000,2000,1000,2000,1000};
@@ -26,17 +26,17 @@ const int gnOffScaleLoTone[10]= {650,600,550,500,450,400,350,300,250,200};
 
 // table for beep duration and repeat rate based on vertical speed
 const BEEP gBeepTbl[10] = {
-// repetition rate saturates at 7m/s
-{8,3},
-{7,3},
-{6,3},
+// repetition rate saturates at 8m/s
+{13,4},
+{11,4},
+{9,4},
+{8,4},
+{7,4},
+{6,4},
 {5,3},
-{4,3},
-{3,2},
-{3,2},
-{2,1},
-{2,1},
-{2,1},
+{4,1},
+{3,1},
+{3,1},
 };
 
 
@@ -50,13 +50,13 @@ void audio_VarioBeep(int nCps) {
    int nRange;
    int newFreqHz = 0;
 
-   if (
-            (gnBeepPeriodTicks <= 0) 
-       ||   ((nTick >= 3) && (ABS(nCps-gnVarioCps) > gnDiscrimThreshold))
-       ||   ((nCps >= gnClimbToneCps) && (gnVarioCps < gnClimbToneCps)) 
-       ||   ((nCps >= gnLiftyAirToneCps) && (gnVarioCps < gnLiftyAirToneCps)) 
-       ) {
+   if (	(gnBeepPeriodTicks <= 0) || 
+		((nTick > gnBeepPeriodTicks/2) && (ABS(nCps-gnVarioCps) > gnDiscrimThreshold)) || 
+		((nCps > gnClimbToneCps) && (gnVarioCps <= gnClimbToneCps)) ||
+		((nCps > gnLiftyAirToneCps) && (gnVarioCps <= gnLiftyAirToneCps))		
+		) {
       gnVarioCps = nCps;
+
       // if sinking much faster than glider sink rate, generate continuous tone alarm
       if (gnVarioCps <= gnSinkToneCps) {
          gnVarioState = VARIO_STATE_SINK;
@@ -73,8 +73,8 @@ void audio_VarioBeep(int nCps) {
             piezo_SetFrequency(nFreqHz);
             }
          else {
-            gnBeepPeriodTicks = 20;
-            gnBeepEndTick  = 18;
+            gnBeepPeriodTicks = 30;
+            gnBeepEndTick  = 25;
             newFreqHz = VARIO_SINK_FREQHZ + ((gnSinkToneCps-gnBeepCps)*(VARIO_MAX_FREQHZ - VARIO_SINK_FREQHZ))/(VARIO_MAX_CPS+gnSinkToneCps);
             CLAMP(newFreqHz,VARIO_MIN_FREQHZ,VARIO_MAX_FREQHZ);
             nFreqHz = newFreqHz;
@@ -113,14 +113,14 @@ void audio_VarioBeep(int nCps) {
                 piezo_SetFrequency(nFreqHz);
                 }
             }
-         else   // in "lifty-air" band, indicate with a ticking sound with longer interval
+         else   // in "lifty-air" band, indicate with different sound
          if (gnVarioCps >= gnLiftyAirToneCps) {
             gnVarioState = VARIO_STATE_LIFTY_AIR;
     		gnBeepCps = gnVarioCps;
     		nTick = 0;
-    		gnBeepPeriodTicks = 20;
+    		gnBeepPeriodTicks = 30;
     		gnBeepEndTick = 2;
-    		newFreqHz = VARIO_TICK_FREQHZ + (gnBeepCps*(VARIO_XOVER_FREQHZ - VARIO_MIN_FREQHZ))/VARIO_XOVER_CPS;
+    		newFreqHz = VARIO_TICK_FREQHZ + ((gnBeepCps - gnLiftyAirToneCps)*400)/(gnClimbToneCps-gnLiftyAirToneCps);
             CLAMP(newFreqHz,VARIO_MIN_FREQHZ,VARIO_MAX_FREQHZ);
             nFreqHz = newFreqHz;
     		piezo_SetFrequency(nFreqHz);  // higher frequency as you approach climb threshold
@@ -140,19 +140,19 @@ void audio_VarioBeep(int nCps) {
    else{
       nTick++;
       gnBeepPeriodTicks--;
-      newFreqHz = nFreqHz;
+	  newFreqHz = nFreqHz;
       if (nTick >= gnBeepEndTick){ // shut off tone
          newFreqHz = 0;
          }
 	  else
 	  if (gnBeepCps == VARIO_MAX_CPS) {
     	  newFreqHz = gnOffScaleHiTone[nTick];
-         }
+            }
       else
 	  if (gnBeepCps == -VARIO_MAX_CPS) {
     	  newFreqHz = gnOffScaleLoTone[nTick];
           }
-     else
+		else
 	 if (gnVarioState == VARIO_STATE_SINK) {
     	 newFreqHz = nFreqHz - 10;
          }
@@ -164,24 +164,23 @@ void audio_VarioBeep(int nCps) {
    }
 
 
-
-void audio_GenerateTone(int nFrequencyHz, int ms) {
+/// Generates audio alarm for a fault event as 4 tones
+/// with the same frequency
+/// @param nFrequencyHz alarm tone frequency.
+void audio_IndicateFault(int nFrequencyHz) {
     piezo_SetFrequency(nFrequencyHz);
-    delayMs(ms);
+    delayMs(300);
+    piezo_SetFrequency(0);
+    delayMs(100);
+    piezo_SetFrequency(nFrequencyHz);
+    delayMs(300);
+    piezo_SetFrequency(0);
+    delayMs(100);
+    piezo_SetFrequency(nFrequencyHz);
+    delayMs(300);
+    piezo_SetFrequency(0);
+    delayMs(100);
+    piezo_SetFrequency(nFrequencyHz);
+    delayMs(300);
     piezo_SetFrequency(0);
     }
-
-// Generates audio alarm for a fault event as 4 tones
-// with the same frequency
-void audio_IndicateFault(int nFrequencyHz) {
-    audio_GenerateTone(nFrequencyHz,300);
-    delayMs(100);
-    audio_GenerateTone(nFrequencyHz,300);
-    delayMs(100);
-    audio_GenerateTone(nFrequencyHz,300);
-    delayMs(100);
-    audio_GenerateTone(nFrequencyHz,300);
-    delayMs(100);
-    }
-    
-    

@@ -8,15 +8,14 @@
 #define max_Read8(addr) 		i2c_RcvByte(I2C_ID_MAX21105,addr)
 #define max_ReadBuf(addr,burst,numBytes,pBuf) i2c_RcvBuf(I2C_ID_MAX21105,addr,numBytes,pBuf)
 
-static s16 gxBias_;
-static s16 gyBias_;
-static s16 gzBias_;
+s16 gxBias;
+s16 gyBias;
+s16 gzBias;
 static float gyroScale_;
 
-static s16 ax0g_;
-static s16 ay0g_;
-static s16 azp1g_;
-static s16 az0g_;
+s16 axBias;
+s16 ayBias;
+s16 azBias;
 static float aScale_;
 
 float gxned,gyned,gzned; // gyro rotation rates in NED coordinates, in degrees/second
@@ -26,26 +25,19 @@ float axned,ayned,azned; // accelerometer values in NED coordinates, in milli-Gs
 // accel sensitivity = counts / milli-G
 // scale = 1 / sensitivity
 void max_InitCalibrationData(void) {
-#if 0
-    // valid for FS = 4g
-    ax0g_ = 320;
-    ay0g_ = -490;
-    azp1g_ = 7690;
+
+	// valid for FS = +/- 4g
+    axBias = 142;
+    ayBias = -545;
+    azBias = 220;
     aScale_ = 1.0f/MAX21105_4G_SENSITIVITY;
-    az0g_ = azp1g_ - (s16)(1000.0f*MAX21105_4G_SENSITIVITY);
-#endif
-    ax0g_ = 640;
-    ay0g_ = -980;
-    azp1g_ = 15380;
-    aScale_ = 1.0f/MAX21105_2G_SENSITIVITY;
-    az0g_ = azp1g_ - (s16)(1000.0f*MAX21105_2G_SENSITIVITY);
     
-    // valid for FS = 250dps
-    gxBias_ = -40; 
-    gyBias_ = -40; 
-    gzBias_ = -115; 
+    // valid for FS = 1000dps
+    gxBias = -14; 
+    gyBias = -11; 
+    gzBias = -30; 
     
-    gyroScale_  = 1.0/MAX21105_250DPS_SENSITIVITY; 
+    gyroScale_  = 1.0/MAX21105_1000DPS_SENSITIVITY; 
     }
 	
 
@@ -58,12 +50,15 @@ void max_Configure(void) {
     max_InitCalibrationData();
     max_Write8(MAX21105_BANK_SELECT, 0); // select bank 0
     max_Write8(MAX21105_SET_PWR, 0); // power down
-    max_Write8(MAX21105_SNS_CFG_1, 0x2B); // selftest disabled,gyro bw = 100hz, gyro fs = 250dps 00:1010:11
-    max_Write8(MAX21105_SNS_CFG_2, 0x05); // rfu, normal fullscale, gyro hpf disabled, gyro odr = 200Hz 00:0:0:0101
+//    max_Write8(MAX21105_SNS_CFG_1, 0x2A); // selftest disabled,gyro bw = 100hz, gyro fs = 500dps 00:1010:10
+    max_Write8(MAX21105_SNS_CFG_1, 0x31); // selftest disabled,gyro bw = 200hz, gyro fs = 1000dps 00:1100:01
+//    max_Write8(MAX21105_SNS_CFG_2, 0x05); // rfu, normal fullscale, gyro hpf disabled, gyro odr = 200Hz 00:0:0:0101
+    max_Write8(MAX21105_SNS_CFG_2, 0x04); // rfu, normal fullscale, gyro hpf disabled, gyro odr = 400Hz 00:0:0:0100
     //max_Write8(MAX21105_SNS_CFG_3, 0x00); //  (default) 
-    max_Write8(MAX21105_SET_ACC_PWR, 0xC0); // accel fs = +/-2G, selftest disabled, rfu 11:000:000
-    max_Write8(MAX21105_ACC_CFG_1, 0x03); // hpf = odr/400, lpf= odr/48, acc odr = 200hz 00:00:0011
-   // max_Write8(MAX21105_ACC_CFG_2, 0x40); // (default)
+//    max_Write8(MAX21105_SET_ACC_PWR, 0xC0); // accel fs = +/-2G, selftest disabled, rfu 11:000:000
+    max_Write8(MAX21105_SET_ACC_PWR, 0x80); // accel fs = +/-4G, selftest disabled, rfu 10:000:000
+    max_Write8(MAX21105_ACC_CFG_1, 0x32); // hpf = odr/400, lpf= odr/3, acc odr = 400hz 00:11:0010
+   // max_Write8(MAX21105_ACC_CFG_2, 0x40); // (default, acc data is low pass filtered)
    // max_Write8(MAX21105_MIF_CFG, 0x00); // I2C fast interface, big endian (default)
     max_Write8(MAX21105_SET_PU_PD_PAD, 0x29); // pulldown int1 and int2, disconnect slave i2c pullups
  //   max_Write8(MAX21105_SET_TEMP_DR, 0x01);//clear DRDY when all registers read, enable temp (default)
@@ -107,9 +102,9 @@ void max_GetAllChannelData(void) {
 // returns rotation rates in degrees/second
 
 void max_GetGyroValues(s16 gx, s16 gy, s16 gz, float* pgx, float* pgy, float* pgz) {
-    *pgx = (float)(gx - gxBias_) * gyroScale_;
-    *pgy = (float)(gy - gyBias_) * gyroScale_;
-    *pgz = (float)(gz - gzBias_) * gyroScale_;
+    *pgx = (float)(gx - gxBias) * gyroScale_;
+    *pgy = (float)(gy - gyBias) * gyroScale_;
+    *pgz = (float)(gz - gzBias) * gyroScale_;
     }
 
 
@@ -122,9 +117,9 @@ void max_GetGyroValues(s16 gx, s16 gy, s16 gz, float* pgx, float* pgy, float* pg
 // returns acceleration values in milliG
 
 void max_GetAccelValues(s16 ax, s16 ay, s16 az, float* pax, float* pay, float* paz) {
-    *pax = (float)(ax0g_ - ax) * aScale_;   
-    *pay = (float)(ay0g_ - ay) * aScale_;
-    *paz = (float)(az0g_ - az) * aScale_;
+    *pax = (float)(axBias - ax) * aScale_;   
+    *pay = (float)(ayBias - ay) * aScale_;
+    *paz = (float)(azBias - az) * aScale_;
     }
 
 
@@ -158,7 +153,7 @@ int max_AverageSamples(s16 buf[], int numSamples) {
     return average;
     }
     
-#define MAX_CALIB_SAMPLES   30
+#define MAX_CALIB_SAMPLES   50
 
 s16 gXBuf[MAX_CALIB_SAMPLES];
 s16 gYBuf[MAX_CALIB_SAMPLES];
@@ -170,19 +165,19 @@ void max_CalibrateGyro(void) {
 
     bdone = 0;
 	uart_ClearFifo(&huart1);
-    while (!bdone) {
+    //while (!bdone) {
         uart_Printf(&huart1, "Do not disturb sensor during calibration\r\n");
         delayMs(1000);
-        max_GetAverageRawData(30,MAX21105_GYRO_X_H, &x, &y, &z);
-        gxBias_ = (s16)x;
-        gyBias_ = (s16)y;
-        gzBias_ = (s16)z;
+        max_GetAverageRawData(50,MAX21105_GYRO_X_H, &x, &y, &z);
+        gxBias = (s16)x;
+        gyBias = (s16)y;
+        gzBias = (s16)z;
         uart_Printf(&huart1,"gxBias = %d\r\n",x);
         uart_Printf(&huart1,"gyBias = %d\r\n",y);
         uart_Printf(&huart1,"gzBias = %d\r\n",z);
         uart_Printf(&huart1,"type any character if OK\r\n");
         bdone = uart_IsCharReady(&huart1,1000);
-        }
+        //}
 	}
 
 
@@ -196,47 +191,36 @@ void max_GetAverageRawData(int numSamples, u08 addr, int* pXavg, int* pYavg, int
     *pZavg = max_AverageSamples(gZBuf,numSamples);
     }
 
-// Step A
-// Place each axis in +1g and -1g orientation and get the test axis averaged readings
-// The difference of the +1g and -1g readings divided by 2 is the axis sensitivity in digits/G
-// The inverse of the sensitivity is the axis scale factor in G's
-
-// Step B
-// Place board horizontally and get the X,Y and Z averaged readings
-// The X and Y readings are in 0g, therefore these are the 0g offsets. Subtract them from
-// the X and Y raw readings to get the corrected X and Y readings
-// The Z reading is in +1g, so subtract the Z sensitivity (LSb/g) found in Step A
-// to get the Z axis 0g offset.
-// Subtract the Z axis 0g offset from the Z raw reading to get the
-// corrected Z reading.
 //
 // To get the acceleration in g's, multiply the (0g corrected) sensor output by the scale
 // To get the acceleration in cm/s*s, multiply the g's by by 980cm/s*s
 
 
 void max_CalibrateAccel(void) {
-    int x,y,z,bdone;
-
-    bdone = 0;
-	uart_ClearFifo(&huart1);
-    while (!bdone) {
+   int x,y,z,bdone;
+   s16 az1g;
+   bdone = 0;
+ 	uart_ClearFifo(&huart1);
+   //while (!bdone) {
         uart_Printf(&huart1, "Orient board Z axis UP\r\n");
         delayMs(1000);
-        max_GetAverageRawData(20,MAX21105_ACC_X_H, &x, &y, &z);
-        ax0g_ = (s16)x;
-        ay0g_ = (s16)y;
-        azp1g_ = (s16)z;
-        uart_Printf(&huart1,"ax0g = %d\r\n",x);
-        uart_Printf(&huart1,"ay0g = %d\r\n",y);
+        max_GetAverageRawData(50,MAX21105_ACC_X_H, &x, &y, &z);
+        axBias = (s16)x;
+        ayBias = (s16)y;
+        az1g = (s16)z;
+        uart_Printf(&huart1,"axBias = %d\r\n",x);
+        uart_Printf(&huart1,"azBias = %d\r\n",y);
         uart_Printf(&huart1,"azp1g = %d\r\n",z);
         uart_Printf(&huart1,"type any character if OK\r\n");
         bdone = uart_IsCharReady(&huart1,1000);
-        }
+  //      }
     uart_Printf(&huart1,"Accelerometer Calibration Data\r\n");
+    azBias = az1g > 0 ? az1g - (s16)(1000.0f*MAX21105_4G_SENSITIVITY) : az1g + (s16)(1000.0f*MAX21105_4G_SENSITIVITY);
 
-    uart_Printf(&huart1,"ax0g = %d\r\n", (int)ax0g_);
-    uart_Printf(&huart1,"ay0g = %d\r\n", (int)ay0g_);
-    uart_Printf(&huart1,"azp1g = %d\r\n", (int)azp1g_);
+    uart_Printf(&huart1,"axBias = %d\r\n", (int)axBias);
+    uart_Printf(&huart1,"ayBias = %d\r\n", (int)ayBias);
+    uart_Printf(&huart1,"azBias = %d\r\n", (int)azBias);
     }
+
 
 #endif

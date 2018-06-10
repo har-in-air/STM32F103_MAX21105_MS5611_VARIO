@@ -1,7 +1,7 @@
 #ifndef MAX21105_H_
 #define MAX21105_H_
 
-//#define MAX_CALIBRATE
+#define MAX_CALIBRATE
 
 #define MAX21105_START_UP_DELAY_MS   100
 #define MAX21105_SAMPLE_DELAY_MS      3  // more than enough for 400Hz ODR
@@ -109,6 +109,13 @@
 extern float gxned,gyned,gzned;
 extern float axned,ayned,azned;
 
+extern s16 gxBias;
+extern s16 gyBias;
+extern s16 gzBias;
+
+extern s16 axBias;
+extern s16 ayBias;
+extern s16 azBias;
 
 void max_InitCalibrationData(void);
 void max_Configure(void);

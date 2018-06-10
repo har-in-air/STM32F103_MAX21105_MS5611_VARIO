@@ -5,10 +5,14 @@
 
 #define UART_STANDARD
 
-#define MS5611_Z_VARIANCE 	    400.0f
-#define IMU_ACCEL_VARIANCE      200.0f
+#define MS5611_Z_VARIANCE 	      400.0f
+#define IMU_ACCEL_VARIANCE       50000.0f
 #define IMU_ACCELBIAS_VARIANCE   1.0f
 
+//#define IMU_MAHONEY
+//#define IMU_MADGWICK
+
+#define DT_MEAS  0.00236f
 
 #define MODE_VARIO      0
 #define MODE_YPR        1
@@ -16,5 +20,6 @@
 
 #define CFG_LCD_DISPLAY
 //#define CFG_USE_MAGNETOMETER
+
 
 #endif
